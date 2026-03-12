@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Inventario · Quirófano IPN</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue:    #1B4F9B;
+    --blue2:   #2E6CC7;
+    --blue3:   #EEF4FB;
+    --red:     #C8102E;
+    --red2:    #ff4560;
+    --green:   #007A33;
+    --green2:  #00b050;
+    --yellow:  #FFC72C;
+    --dark:    #0D1B2A;
+    --mid:     #344966;
+    --light:   #F4F7FC;
+    --white:   #FFFFFF;
+    --warn-bg: #FFF8E1;
+    --warn-fg: #8B4513;
+    --crit-bg: #FFEBEE;
+    --crit-fg: #C8102E;
+    --ok-bg:   #E8F5E9;
+    --ok-fg:   #007A33;
+    --border:  #D1DCF0;
+    --shadow:  0 4px 24px rgba(27,79,155,.10);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 15px; }
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    min-height: 100vh;
+  }
+
+  /* ---- HEADER ---- */
+  header {
+    background: linear-gradient(135deg, var(--blue) 0%, #0a2d6e 100%);
+    padding: 0 2rem;
+    display: flex; align-items: center; gap: 1.5rem;
+    height: 68px;
+    box-shadow: 0 2px 16px rgba(0,0,0,.25);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3px; width: 28px; height: 28px;
+  }
+  .logo-grid span { border-radius: 2px; }
+  .lg-r { background: #C8102E; }
+  .lg-b { background: #2E6CC7; }
+  .lg-g { background: #007A33; }
+  .lg-y { background: #FFC72C; border-radius: 50% !important; }
+  .logo-text { font-size: 1.4rem; font-weight: 800; color: #fff; letter-spacing: .04em; }
+  .logo-sub  { font-size: .7rem; color: rgba(255,255,255,.6); font-weight: 300; letter-spacing: .08em; text-transform: uppercase; }
+  header .spacer { flex: 1; }
+  .sync-btn {
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    color: #fff; padding: .45rem 1.1rem; border-radius: 8px; font-family: 'Sora', sans-serif;
+    font-size: .78rem; font-weight: 600; cursor: pointer; transition: background .2s;
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .sync-btn:hover { background: rgba(255,255,255,.22); }
+  .sheet-indicator {
+    font-size: .72rem; color: rgba(255,255,255,.55); font-family: 'DM Mono', monospace;
+    background: rgba(0,0,0,.2); padding: .3rem .8rem; border-radius: 20px;
+  }
+
+  /* ---- SETUP PANEL ---- */
+  #setup-panel {
+    max-width: 600px; margin: 3rem auto; background: var(--white);
+    border-radius: 16px; padding: 2.5rem; box-shadow: var(--shadow);
+    border-top: 4px solid var(--blue);
+  }
+  #setup-panel h2 { font-size: 1.3rem; font-weight: 700; color: var(--blue); margin-bottom: .4rem; }
+  #setup-panel p  { font-size: .85rem; color: var(--mid); margin-bottom: 1.5rem; line-height: 1.6; }
+  .step-list { counter-reset: steps; margin-bottom: 1.5rem; }
+  .step-list li {
+    counter-increment: steps; list-style: none; padding: .6rem 0 .6rem 2.5rem;
+    position: relative; font-size: .85rem; color: var(--mid); border-bottom: 1px solid var(--border);
+  }
+  .step-list li::before {
+    content: counter(steps); position: absolute; left: 0; top: .55rem;
+    background: var(--blue2); color: #fff; width: 20px; height: 20px; border-radius: 50%;
+    font-size: .7rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .step-list li code { background: var(--blue3); padding: .1em .4em; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: .8rem; color: var(--blue); }
+  .input-group { display: flex; gap: .8rem; margin-top: 1rem; }
+  .input-group input {
+    flex: 1; padding: .7rem 1rem; border: 2px solid var(--border); border-radius: 10px;
+    font-family: 'DM Mono', monospace; font-size: .85rem; outline: none; transition: border .2s;
+  }
+  .input-group input:focus { border-color: var(--blue2); }
+  .btn-primary {
+    background: var(--blue); color: #fff; border: none; padding: .7rem 1.4rem;
+    border-radius: 10px; font-family: 'Sora', sans-serif; font-weight: 700; cursor: pointer;
+    font-size: .85rem; transition: background .2s; white-space: nowrap;
+  }
+  .btn-primary:hover { background: var(--blue2); }
+  .demo-link { margin-top: .8rem; font-size: .78rem; color: var(--blue2); cursor: pointer; text-decoration: underline; }
+
+  /* ---- MAIN LAYOUT ---- */
+  #app { display: none; }
+  .main-wrap { max-width: 1400px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+
+  /* ---- STATS BAR ---- */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--white); border-radius: 12px; padding: 1.1rem 1.4rem;
+    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: .2rem;
+    border-left: 4px solid transparent;
+  }
+  .stat-card.blue  { border-color: var(--blue); }
+  .stat-card.green { border-color: var(--green); }
+  .stat-card.warn  { border-color: var(--yellow); }
+  .stat-card.crit  { border-color: var(--red); }
+  .stat-num { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+  .stat-card.blue  .stat-num { color: var(--blue); }
+  .stat-card.green .stat-num { color: var(--green); }
+  .stat-card.warn  .stat-num { color: #e6a800; }
+  .stat-card.crit  .stat-num { color: var(--red); }
+  .stat-lbl { font-size: .72rem; color: var(--mid); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+
+  /* ---- TABS ---- */
+  .tabs { display: flex; gap: .3rem; margin-bottom: 1.2rem; }
+  .tab {
+    padding: .55rem 1.2rem; border-radius: 8px 8px 0 0; border: 2px solid transparent;
+    font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .18s;
+    background: var(--white); color: var(--mid); border-bottom: none;
+  }
+  .tab.active { background: var(--blue); color: #fff; }
+  .tab:hover:not(.active) { background: var(--blue3); color: var(--blue); }
+
+  /* ---- PANEL ---- */
+  .panel {
+    background: var(--white); border-radius: 0 12px 12px 12px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; gap: 1rem; padding: 1rem 1.4rem;
+    border-bottom: 2px solid var(--border); background: #fafcff;
+    flex-wrap: wrap;
+  }
+  .panel-title { font-size: 1rem; font-weight: 700; color: var(--dark); flex: 1; }
+  .search-box {
+    padding: .5rem .9rem; border: 2px solid var(--border); border-radius: 8px;
+    font-family: 'Sora', sans-serif; font-size: .82rem; width: 240px; outline: none;
+    transition: border .2s;
+  }
+  .search-box:focus { border-color: var(--blue2); }
+  .filter-sel {
+    padding: .48rem .8rem; border: 2px solid var(--border); border-radius: 8px;
+    font-family: 'Sora', sans-serif; font-size: .82rem; outline: none; background: #fff;
+    cursor: pointer;
+  }
+  .btn-export {
+    background: var(--green); color: #fff; border: none; padding: .5rem 1.1rem;
+    border-radius: 8px; font-family: 'Sora', sans-serif; font-size: .8rem; font-weight: 600;
+    cursor: pointer; transition: background .2s; display: flex; align-items: center; gap: .4rem;
+  }
+  .btn-export:hover { background: #006628; }
+
+  /* ---- TABLE ---- */
+  .table-wrap { overflow-x: auto; max-height: 62vh; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  thead th {
+    background: var(--blue); color: #fff; padding: .7rem .8rem; text-align: left;
+    font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+    position: sticky; top: 0; z-index: 10; white-space: nowrap;
+  }
+  thead th.center { text-align: center; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  tbody tr:hover { background: var(--blue3); }
+  tbody td { padding: .55rem .8rem; vertical-align: middle; }
+  .td-desc { font-weight: 600; max-width: 280px; }
+  .td-desc small { display: block; font-weight: 400; color: var(--mid); font-size: .72rem; }
+  .td-center { text-align: center; }
+  .badge {
+    display: inline-block; padding: .2em .65em; border-radius: 20px; font-size: .72rem;
+    font-weight: 700; font-family: 'DM Mono', monospace;
+  }
+  .badge-med  { background: #E8F5E9; color: #007A33; }
+  .badge-desc { background: #E3F2FD; color: #1565C0; }
+
+  /* stock input */
+  .stock-input {
+    width: 70px; text-align: center; padding: .35rem .5rem;
+    border: 2px solid var(--border); border-radius: 8px; font-family: 'DM Mono', monospace;
+    font-size: .88rem; font-weight: 700; outline: none; transition: border .15s, background .15s;
+  }
+  .stock-input:focus { border-color: var(--blue2); background: var(--blue3); }
+  .stock-input.saved { border-color: var(--green2); background: #e8f5e9; }
+  .stock-input.crit  { border-color: var(--red); background: #ffebee; }
+
+  /* diff pill */
+  .diff { font-family: 'DM Mono', monospace; font-weight: 700; font-size: .82rem; }
+  .diff.ok   { color: var(--green); }
+  .diff.warn { color: #e6a800; }
+  .diff.crit { color: var(--red); }
+  .diff.none { color: #aaa; font-style: italic; }
+
+  /* ---- COMPRAS PANEL ---- */
+  .compras-header {
+    background: linear-gradient(90deg, var(--red) 0%, #8B0000 100%);
+    color: #fff; padding: 1.1rem 1.4rem; display: flex; align-items: center; gap: .8rem;
+  }
+  .compras-title { font-size: 1rem; font-weight: 700; }
+  .compras-sub   { font-size: .78rem; opacity: .75; }
+  .compras-spacer { flex: 1; }
+
+  .compras-table thead th { background: #8B0000; }
+  .need-qty {
+    font-family: 'DM Mono', monospace; font-size: .9rem; font-weight: 700; color: var(--red);
+  }
+  .proveedor-badge {
+    background: #f0f4ff; color: var(--blue); padding: .2em .6em;
+    border-radius: 6px; font-size: .75rem; font-weight: 600;
+  }
+  .precio-val { font-family: 'DM Mono', monospace; font-size: .82rem; color: var(--mid); }
+
+  /* total compras */
+  .total-row td { background: var(--dark) !important; color: #fff !important; font-weight: 700; padding: .7rem .8rem; }
+  .total-row .need-qty { color: var(--yellow); }
+
+  /* ---- SAVE STATUS ---- */
+  #save-status {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--green);
+    color: #fff; padding: .7rem 1.4rem; border-radius: 30px; font-size: .82rem; font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,122,51,.3); display: none; z-index: 999;
+    animation: popIn .3s ease;
+  }
+  @keyframes popIn { from { transform: scale(.8) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+
+  /* ---- TOAST ---- */
+  #toast {
+    position: fixed; top: 80px; right: 1.5rem; background: var(--dark);
+    color: #fff; padding: .8rem 1.4rem; border-radius: 10px; font-size: .82rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,.3); display: none; z-index: 999; max-width: 340px;
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* progress bar */
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin: .3rem 0; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+
+  /* responsive */
+  @media (max-width: 768px) {
+    .stats-bar { grid-template-columns: 1fr 1fr; }
+    .td-desc { max-width: 160px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo-grid">
+      <span class="lg-r"></span><span class="lg-y"></span>
+      <span class="lg-g"></span><span class="lg-b"></span>
+    </div>
+    <div>
+      <div class="logo-text">IPN</div>
+      <div class="logo-sub">Quirófano · Inventario</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="sheet-indicator" id="sheet-id-display">✓ Google Sheet IPN</div>
+  <button class="sync-btn" onclick="syncToSheet()" title="Abre una nueva pestaña para guardar en Google Sheets">☁ Guardar en Sheets</button>
+  <button class="sync-btn" onclick="loadFromSheetManual()">↺ Restaurar datos locales</button>
+</header>
+
+<!-- SETUP PANEL -->
+<div id="setup-panel" style="display:none">
+  <h2>⚙️ Configurar Google Sheets</h2>
+  <p>Este sistema guarda automáticamente el stock en tu Google Sheet. Seguí estos pasos una sola vez:</p>
+  <ol class="step-list">
+    <li>Abrí <a href="https://sheets.google.com" target="_blank">Google Sheets</a> y creá una hoja nueva llamada <code>Inventario</code></li>
+    <li>Andá a <strong>Extensiones → Apps Script</strong> y pegá el script de la guía adjunta</li>
+    <li>Publicá el script como <strong>Aplicación web</strong> (cualquiera puede acceder)</li>
+    <li>Copiá la URL que te da Google y pegala acá abajo</li>
+  </ol>
+  <div class="input-group">
+    <input type="text" id="sheet-url-input" placeholder="https://script.google.com/macros/s/..." />
+    <button class="btn-primary" onclick="connectSheet()">Conectar</button>
+  </div>
+  <div class="demo-link" onclick="useDemoMode()">→ Usar modo demostración (sin Google Sheets)</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="main-wrap">
+
+    <!-- STATS -->
+    <div id="info-banner" style="background:#1B4F9B;color:#fff;padding:.7rem 1.4rem;
+  border-radius:10px;margin-bottom:1rem;font-size:.83rem;display:flex;align-items:center;gap:.8rem;line-height:1.5">
+  <span style="font-size:1.3rem">💡</span>
+  <div>
+    <strong>Modo local activo</strong> — Los datos se guardan automáticamente en este navegador.<br>
+    Para sincronizar con Google Sheets, descargá el archivo y abrilo directamente en Chrome
+    (no desde Claude). O presioná <strong>"☁ Guardar en Sheets"</strong> — se abrirá una pestaña nueva para completar el guardado.
+  </div>
+  <button onclick="document.getElementById('info-banner').style.display='none'"
+    style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:.3rem .8rem;
+    border-radius:6px;cursor:pointer;white-space:nowrap;font-size:.8rem">✕ Cerrar</button>
+</div>
+<div class="stats-bar">
+      <div class="stat-card blue">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-lbl">Total productos</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-num" id="stat-cargados">0</div>
+        <div class="stat-lbl">Stock cargado</div>
+        <div class="progress-bar"><div class="progress-fill" id="prog-cargados" style="background:var(--green);width:0%"></div></div>
+      </div>
+      <div class="stat-card warn">
+        <div class="stat-num" id="stat-warn">0</div>
+        <div class="stat-lbl">Stock bajo (≤3)</div>
+      </div>
+      <div class="stat-card crit">
+        <div class="stat-num" id="stat-compras">0</div>
+        <div class="stat-lbl">A comprar</div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('inventario')">📋 Carga de Stock</div>
+      <div class="tab" onclick="showTab('compras')">🛒 Lista de Compras</div>
+    </div>
+
+    <!-- TAB INVENTARIO -->
+    <div id="tab-inventario" class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Carga de Stock Actual</div>
+        <input type="text" class="search-box" id="search-inv" placeholder="🔍 Buscar producto..." oninput="renderInventario()">
+        <select class="filter-sel" id="filter-tipo" onchange="renderInventario()">
+          <option value="">Todos</option>
+          <option value="MED">Solo Medicamentos</option>
+          <option value="DESC">Solo Descartables</option>
+        </select>
+        <select class="filter-sel" id="filter-estado" onchange="renderInventario()">
+          <option value="">Todos los estados</option>
+          <option value="crit">Crítico (0)</option>
+          <option value="warn">Bajo (1-3)</option>
+          <option value="ok">OK (>3)</option>
+          <option value="sd">Sin dato</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="inv-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="center">Tipo</th>
+              <th class="center">Inv. Sistema</th>
+              <th class="center">Stock Actual</th>
+              <th class="center">Diferencia</th>
+              <th>Proveedor</th>
+              <th class="center">Precio (Gs.)</th>
+            </tr>
+          </thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB COMPRAS -->
+    <div id="tab-compras" class="panel" style="display:none">
+      <div class="compras-header">
+        <div>
+          <div class="compras-title">🛒 Lista de Compras Necesarias</div>
+          <div class="compras-sub">Productos donde el stock actual es menor al inventario mínimo del sistema</div>
+        </div>
+        <div class="compras-spacer"></div>
+        <button class="btn-export" onclick="exportarCompras()">⬇ Exportar CSV</button>
+        <button class="btn-export" onclick="imprimirCompras()" style="background:var(--blue);margin-left:.5rem">🖨 Imprimir</button>
+      </div>
+      <div class="table-wrap">
+        <table id="compras-table" class="compras-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="center">Tipo</th>
+              <th class="center">Inv. Mínimo</th>
+              <th class="center">Stock Actual</th>
+              <th class="center">A Comprar</th>
+              <th>Proveedor</th>
+              <th>Marca</th>
+              <th class="center">Precio Unit. (Gs.)</th>
+              <th class="center">Total (Gs.)</th>
+            </tr>
+          </thead>
+          <tbody id="compras-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="save-status">✓ Guardado en Google Sheets</div>
+<div id="toast"></div>
+
+<script>
+// ================================================================
+// BASE DE DATOS COMPLETA DEL INVENTARIO
+// ================================================================
+const PRODUCTOS = [
+  // [id, nombre, udm, inv_sistema, marca, proveedor, precio, tipo]
+  // MEDICAMENTOS
+  [1,"ALGILASCA INY.","UNIDAD",50,"ALGILASCA","LASCA",3524,"MED"],
+  [2,"ATRACURIO BESILATO 10MG","UNIDAD",5,"ATRACURIO","FARMACIA INFANTIL",40000,"MED"],
+  [3,"BETACORTEN HIDROCORTISONA","UNIDAD",3,"HIDROCORTISONA","FARMACIA INFANTIL",30870,"MED"],
+  [4,"CEFRAZOL 1G FC/AMP C/SOL. INY.","FRASCO",15,"CEFRAZOL","LASCA",14827,"MED"],
+  [5,"CLANZOL LIOF + SOLV","AMPOLLA",20,"CLANZOL","LASCA",42019,"MED"],
+  [6,"COMPAZ SOL. INY.","UNIDAD",5,"COMPAZ","FARMACIA INFANTIL",8927,"MED"],
+  [7,"CONTRO NATURE X 6","UNIDAD",1,"CONTROL","FARMACIA INFANTIL",14160,"MED"],
+  [8,"DOLOSTOP 60 MG INY. X 1 AMP 2 ML","UNIDAD",40,"DOLOSTOP","LASCA",18528,"MED"],
+  [9,"DORMICUM","UNIDAD",5,"DORMICUM","FARMACIA INFANTIL",45229,"MED"],
+  [10,"DORMIRE 15 MG SOL. INY","UNIDAD",3,"DORMIRE","FARMACIA INFANTIL",88099,"MED"],
+  [11,"DOXATAR 2ML","UNIDAD",5,"DOXATAR","FARMACIA INFANTIL",23856,"MED"],
+  [12,"FAMODINA SOL. INY.","UNIDAD",4,"FAMODINA","FARMACIA INFANTIL",87696,"MED"],
+  [13,"FENTANEST SOL. IN","UNIDAD",2,"FENTANEST","FARMACIA INFANTIL",27879,"MED"],
+  [14,"GENTAL CREMA CAJA X 20 G","UNIDAD",15,"GENTAL BETA","LASCA",17734,"MED"],
+  [15,"IOP SOL. FCO. X 100 ML","UNIDAD",5,"IOP","FARMACIA INFANTIL",29568,"MED"],
+  [16,"IOP SOL. X 1000ML","UNIDAD",1,"IOP","FARMACIA INFANTIL",141568,"MED"],
+  [17,"IRUXOL POMADA","UNIDAD",5,"IRUXOL","FARMACIA INFANTIL",50895,"MED"],
+  [18,"KETAMIN SOL. INY.","UNIDAD",5,"KETAMIN","FARMACIA INFANTIL",57850,"MED"],
+  [19,"LEVOMIN SOL. INY.","UNIDAD",27,"LEVOMIN","FARMACIA INFANTIL",2467,"MED"],
+  [20,"LUNG AEROSOL P/INH","AMPOLLA",1,"LUNG","FARMACIA INFANTIL",35235,"MED"],
+  [21,"MEPERDOL SOL. INY.","UNIDAD",5,"MEPERDOL","FARMACIA INFANTIL",27170,"MED"],
+  [22,"NAFAZILINA NORMAL","UNIDAD",5,"NAFAZOLINA","FARMACIA INFANTIL",25143,"MED"],
+  [23,"NEOCAINA PESADA 4 ML","UNIDAD",2,"NEOCAINA PESADA","DIPROAN",49550,"MED"],
+  [24,"NOVABUPI X 4 ML","UNIDAD",5,"NOVABUPI","DIPROAN",21971,"MED"],
+  [25,"NOVOSPORINA UNGÜENTO","UNIDAD",10,"NOVOSPORINA","FARMACIA INFANTIL",34713,"MED"],
+  [26,"ONDATRON 4MG","UNIDAD",40,"ONDATRON","LASCA",15984,"MED"],
+  [27,"PLUSCORT 500 SOL. INY.","UNIDAD",2,"PLUSCORT","FARMACIA INFANTIL",72864,"MED"],
+  [28,"PLUSCOT 500 SOL. INY.","UNIDAD",5,"PLUSCORT","FARMACIA INFANTIL",72932,"MED"],
+  [29,"PROPOVAN X 20ML","UNIDAD",10,"PROPOVAN","DIPROAN",42525,"MED"],
+  [30,"QUIMFADOL SOL. INY.","UNIDAD",5,"QUIMFADOL","FARMACIA INFANTIL",11310,"MED"],
+  [31,"RAPIFEN INY. CAJA 5 AMP X 2 ML","UNIDAD",5,"RAPIFEN","FARMACIA INFANTIL",27252,"MED"],
+  [32,"REMIFAS","UNIDAD",1,"REMIFAS","FARMACIA INFANTIL",65250,"MED"],
+  [33,"REMIFAS 2 MG","UNIDAD",1,"REMIFAS","FARMACIA INFANTIL",326250,"MED"],
+  [34,"REMIFAS CRISTALIA 2 MG","UNIDAD",5,"REMIFAS","FARMACIA INFANTIL",65250,"MED"],
+  [35,"ROPI 7.5 MG/ML","UNIDAD",5,"ROPI","DIPROAN",55950,"MED"],
+  [36,"SEVOCRIS X 250 ML","UNIDAD",1,"SEVOCRIS","DIPROAN",1608370,"MED"],
+  [37,"SUERO GLUCOSADO 100 ML","UNIDAD",5,"—","SUMED",17000,"MED"],
+  [38,"SUERO RINGER 500 ML","AMPOLLA",25,"—","SUMED",11000,"MED"],
+  [39,"SUERO FISIOLOGICO 500 ML","UNIDAD",10,"—","SUMED",0,"MED"],
+  [40,"SUERO FISIOLOGICO 1000 ML","UNIDAD",10,"—","SUMED",0,"MED"],
+  [41,"TRACUR SOL. IMY.","UNIDAD",5,"TRACUR","FARMACIA INFANTIL",47989,"MED"],
+  [42,"TRIFAMOX INL DUO","UNIDAD",5,"TRIFAMOX INL DUO","FARMACIA INFANTIL",25869,"MED"],
+  [43,"VENDA SEMIELASTICA 50m","UNIDAD",5,"—","FARMACIA INFANTIL",8811,"MED"],
+  [44,"XYLESTESIN 2% C/E X 20 ML","UNIDAD",5,"XYLESTESIN","DIPROAN",25500,"MED"],
+  [45,"XYLESTESIN 2% JALEA","UNIDAD",2,"XYLESTESIN","DIPROAN",22050,"MED"],
+  [46,"XYLESTESIN 2% S/E X 20 ML","UNIDAD",5,"XYLESTESIN","DIPROAN",25500,"MED"],
+  [47,"XYLESTESIN SPRAY X 50 ML","UNIDAD",3,"—","DIPROAN",25500,"MED"],
+  // DESCARTABLES
+  [48,"AGUJA RAQUIDEA NRO 27 G","UNIDAD",5,"—","DIPROAN",38500,"DESC"],
+  [49,"AGUA BIDESTILADA ENVASA 1000 ML","UNIDAD",10,"—","GAESA",15500,"DESC"],
+  [50,"AGUA OXIGENADA DE 500 ML","UNIDAD",10,"—","SUMED",5000,"DESC"],
+  [51,"AGUJA DESCARTABLE 25 X 5/8 NARANJA","UNIDAD",200,"—","SUMED",185,"DESC"],
+  [52,"AGUJA DESCARTABLE NRO 23 X 1","UNIDAD",200,"—","SUMED",185,"DESC"],
+  [53,"AGUJA DESCARTABLE NRO 25 X","UNIDAD",50,"—","GAESA",185,"DESC"],
+  [54,"AGUJA ESPINAL PENCAN NRO 27","UNIDAD",100,"—","SUMED",55000,"DESC"],
+  [55,"AGUJA P. LANCET NRO 27 G","UNIDAD",10,"—","GAESA",22000,"DESC"],
+  [56,"ALCOHOL RECTIFICADO 96% X 1000CC","UNIDAD",5,"—","GAESA",21000,"DESC"],
+  [57,"ALGODÓN LAMINADO 10CM","UNIDAD",10,"MIMOSO","GAESA",5000,"DESC"],
+  [58,"ALGODÓN LAMINADO 15 CM","UNIDAD",5,"—","SUMED",12500,"DESC"],
+  [59,"ALGODÓN LAMINADO 20CM","UNIDAD",5,"—","SUMED",15500,"DESC"],
+  [60,"BACTIGRAS X 10 PARCHES","UNIDAD",15,"—","SUMED",12000,"DESC"],
+  [61,"BOLSA BLANCA X 7 LITROS","UNIDAD",30,"—","GAESA",7500,"DESC"],
+  [62,"CABESTRILLO T 2","UNIDAD",25,"—","HOSPITALAR",36000,"DESC"],
+  [63,"CATETER INTRAVENOSO NRO 14","UNIDAD",10,"—","HOSPITALAR",52000,"DESC"],
+  [64,"CATETER INTRAVENOSO NRO 16","UNIDAD",10,"—","HOSPITALAR",3000,"DESC"],
+  [65,"CATETER INTRAVENOSO NRO 18","UNIDAD",10,"—","HOSPITALAR",3000,"DESC"],
+  [66,"CATETER INTRAVENOSO NRO 20","UNIDAD",10,"—","HOSPITALAR",30000,"DESC"],
+  [67,"CATETER INTRAVENOSO NRO 22","UNIDAD",30,"—","HOSPITALAR",3000,"DESC"],
+  [68,"CATETER INTRAVENOSO NRO 24","UNIDAD",30,"—","HOSPITALAR",3000,"DESC"],
+  [69,"CATETER VENOSO CENTRAL 3V 4FRX 1 CM","UNIDAD",5,"—","CODEX",300000,"DESC"],
+  [70,"CATGUT CROMADO 3-0 OTE","UNIDAD",12,"CATGUT","DPM",23265,"DESC"],
+  [71,"CATGUT CROMADO 3-0 DTE","UNIDAD",5,"CATGUT","DPM",23265,"DESC"],
+  [72,"CATGUT CROMADO 4-0 DRB","UNIDAD",12,"CATGUT","DPM",22523,"DESC"],
+  [73,"CATGUT CROMADO 5-0 DRB","UNIDAD",12,"CATGUT","DPM",25675,"DESC"],
+  [74,"CATGUT CROMADO 5-0/DSH-1","UNIDAD",15,"CATGUT","DPM",25675,"DESC"],
+  [75,"CATGUT SIMPLE 2-0 DCT","UNIDAD",15,"CATGUT","DPM",22523,"DESC"],
+  [76,"CATGUT SIMPLE E 0 DCT","UNIDAD",12,"CATGUT","DPM",21863,"DESC"],
+  [77,"CATGUT SIMPLE 4-0/DRB","UNIDAD",12,"CATGUT","DPM",22523,"DESC"],
+  [78,"CATGUT SIMPLE 4-0/DRB-1","UNIDAD",15,"CATGUT","DPM",22523,"DESC"],
+  [79,"CATGUT SIMPLE 5-0/DRB-1 UR","UNIDAD",15,"CATGUT","DPM",21945,"DESC"],
+  [80,"CIRCUITO PEDIATRICO ANESTESIA C/Y S/P","UNIDAD",4,"—","DPM",50160,"DESC"],
+  [81,"COMPRESA QUIRURGICA 45 X 45 CM","UNIDAD",10,"—","GAESA",5000,"DESC"],
+  [82,"CUTICELL 7.5 X 7.5","UNIDAD",100,"GREET MED","SUMED",650,"DESC"],
+  [83,"DEMECAPRONE 4-0/DPS-2","UNIDAD",4,"DEMECAPRONE","DPM",41003,"DESC"],
+  [84,"DEMEDIOX 5-0 DC","UNIDAD",5,"DEMEDIOX","DPM",106173,"DESC"],
+  [85,"DEMEDIOX 6-0","UNIDAD",5,"DEMEDIOX","DPM",106173,"DESC"],
+  [86,"DREN PENROSE 2","UNIDAD",5,"—","SUMED",6883,"DESC"],
+  [87,"ELASTOMULL 10CM","UNIDAD",10,"—","DPM",7425,"DESC"],
+  [88,"ELECTRODO ADULTO / ECG","UNIDAD",50,"—","DPM",132330,"DESC"],
+  [89,"ELECTRODO AMB PEDIATRICO X 50","UNIDAD",50,"—","DPM",132330,"DESC"],
+  [90,"EQUIPO MACROGOTERO 200 A PRESION","UNIDAD",20,"BEL MED","GAESA",2500,"DESC"],
+  [91,"EQUIPO MICROGOTERO","UNIDAD",25,"—","HOSPITALAR",2500,"DESC"],
+  [92,"EQUIPO VOLUTROL MACRO 20 DROPS 150 ML","UNIDAD",30,"BEL MED","GAESA",9000,"DESC"],
+  [93,"EQUIPO VOLUTROL MICROGOTERO 150 ML","UNIDAD",15,"—","HOSPITALAR",10000,"DESC"],
+  [94,"FILTRO HUMIFICADOR PEDIATRICO","UNIDAD",10,"—","DPM",18233,"DESC"],
+  [95,"FILTRO VIROBAC PIANESTESIA","UNIDAD",5,"—","DPM",18233,"DESC"],
+  [96,"FRASCO DE DRENAJE DE TORAX 500 ML","UNIDAD",4,"—","CODEX",120000,"DESC"],
+  [97,"FUNDA DE CAMARA ENROLLADA","UNIDAD",30,"—","GAESA",1500,"DESC"],
+  [98,"GUANTE DE EXAMEN M","UNIDAD",100,"—","HOSPITALAR",34500,"DESC"],
+  [99,"GUANTE ESTERIL NRO 6.5","UNIDAD",50,"—","HOSPITALAR",3800,"DESC"],
+  [100,"GUANTE ESTERIL NRO 7","UNIDAD",50,"—","HOSPITALAR",3500,"DESC"],
+  [101,"GUANTE ESTERIL NRO 7.5","UNIDAD",50,"—","HOSPITALAR",3500,"DESC"],
+  [102,"GUANTE HIPO ALERGENICO 6.5","UNIDAD",50,"B. BRAUN","GAESA",27000,"DESC"],
+  [103,"GUANTE HIPO ALERGENICO 7","UNIDAD",50,"B. BRAUN","GAESA",27000,"DESC"],
+  [104,"GUANTE HIPO ALERGENICO 7.5","UNIDAD",50,"B. BRAUN","GAESA",27000,"DESC"],
+  [105,"JERINGA 3 CC","UNIDAD",100,"—","SUMED",490,"DESC"],
+  [106,"JERINGA 5 CC","UNIDAD",100,"—","SUMED",630,"DESC"],
+  [107,"JERINGA 10 CC","UNIDAD",100,"—","SUMED",790,"DESC"],
+  [108,"JERINGA 20 CC","UNIDAD",100,"—","SUMED",1070,"DESC"],
+  [109,"JERINGA DE INSULINA 1 CC","UNIDAD",20,"—","SUMED",1500,"DESC"],
+  [110,"LAMINA BISTER N 15 C/ CONEXION","UNIDAD",30,"—","—",0,"DESC"],
+  [111,"LAMINA BISTER N 17","UNIDAD",60,"—","—",0,"DESC"],
+  [112,"LAMINA BISTERI N 23","UNIDAD",100,"—","—",0,"DESC"],
+  [113,"MASCARA PARA ANESTESIA NRO 3","UNIDAD",5,"—","HOSPITALAR",17688,"DESC"],
+  [114,"MASCARA PARA ANESTESIA NRO 4","UNIDAD",5,"—","DIPROAN",17688,"DESC"],
+  [115,"MASCARA PARA ANESTESIA NRO 5","UNIDAD",5,"—","DIPROAN",1500,"DESC"],
+  [116,"MASCARILLA CON RESERVORIO ADULTO","UNIDAD",10,"—","DIPROAN",12000,"DESC"],
+  [117,"MASCARILLA PARA OXIGENO ADULTO","UNIDAD",5,"—","HOSPITALAR",1500,"DESC"],
+  [118,"MASCARILLA PARA OXIGENO PEDIATRICO","UNIDAD",10,"—","HOSPITALAR",1500,"DESC"],
+  [119,"MICROPORE 1/2 X 10 YARDAS","UNIDAD",10,"—","HOSPITALAR",7800,"DESC"],
+  [120,"MICROPORE 3 X 10 YARDAS","UNIDAD",10,"—","HOSPITALAR",15200,"DESC"],
+  [121,"PAPEL TERMICO P/ESTERILIZACION","UNIDAD",10,"—","GAESA",24000,"DESC"],
+  [122,"POLIGLA 910 NRO 2-0/DSH","UNIDAD",12,"POLIGLA 910","DPM",25575,"DESC"],
+  [123,"POLIGLA 910 NRO 6-0 DRB","UNIDAD",15,"POLIGLA 910","DPM",25575,"DESC"],
+  [124,"POLIGLA 910 NRO 7-0 DC","UNIDAD",15,"POLIGLA 910","DPM",25575,"DESC"],
+  [125,"ROPA DESCARTABLE AZUL T L","UNIDAD",10,"—","SUMED",15000,"DESC"],
+  [126,"ROPA DESCARTABLE AZUL T XL","UNIDAD",10,"—","SUMED",17000,"DESC"],
+  [127,"SEDA 2-0 DSH","UNIDAD",12,"SEDA","DPM",19890,"DESC"],
+  [128,"SEDA 3-0 DSH","UNIDAD",10,"SEDA","DPM",19890,"DESC"],
+  [129,"SEDA 4-0 DRB","UNIDAD",15,"SEDA","SUMED",19890,"DESC"],
+  [130,"SEDA 5-0 DRB-1 UR","UNIDAD",15,"SEDA","SUMED",19890,"DESC"],
+  [131,"SEDA NRO 1 DCT","UNIDAD",10,"SEDA","DPM",19890,"DESC"],
+  [132,"SEDA NRO 2 DCT","UNIDAD",12,"SEDA","DPM",19890,"DESC"],
+  [133,"SONDA F 9","UNIDAD",5,"—","—",0,"DESC"],
+  [134,"SONDA F 12","UNIDAD",5,"—","—",0,"DESC"],
+  [135,"TUBO ENDOTRAQUEAL C/BALON NRO 7.5","UNIDAD",20,"BEL MED","GAESA",2500,"DESC"],
+  [136,"TUBO ENDOTRAQUEAL S/BALON NRO 3.0","UNIDAD",10,"—","DIPROAN",2900,"DESC"],
+  [137,"TUBO ENDOTRAQUEAL S/BALON NRO 3.5","UNIDAD",10,"—","DIPROAN",12000,"DESC"],
+  [138,"TUBO ENDOTRAQUEAL S/BALON NRO 4.0","UNIDAD",10,"—","DIPROAN",12000,"DESC"],
+  [139,"TUBO ENDOTRAQUEAL S/BALON NRO 4.5","UNIDAD",10,"—","DIPROAN",12000,"DESC"],
+  [140,"TUBO ENDOTRAQUEAL S/BALON NRO 5.0","UNIDAD",10,"—","DIPROAN",12000,"DESC"],
+  [141,"TUBO ENDOTRAQUEAL S/BALON NRO 5.5","UNIDAD",10,"—","DIPROAN",12000,"DESC"],
+  [142,"VENDA CREPE 15CM X 4 M","UNIDAD",10,"—","HOSPITALAR",10000,"DESC"],
+  [143,"VENDA CREPE 10CM X 4 M","UNIDAD",10,"—","HOSPITALAR",12000,"DESC"],
+  [144,"VENDA ELASTICA 15 CM X 4 M","UNIDAD",10,"—","HOSPITALAR",15000,"DESC"],
+];
+
+// ================================================================
+// STATE
+// ================================================================
+let stockData = {}; // { id: cantidad }
+let sheetUrl  = 'https://script.google.com/macros/s/AKfycbz_26G-jaMEegTPTI-W0Md1svLA2LeS6X-NOL5xGHImz27D6LiSCiMfN-HeGz9COqDU/exec';
+let demoMode  = false;
+
+// ================================================================
+// INIT
+// ================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  const savedStock = localStorage.getItem('ipn_stock');
+  if (savedStock) stockData = JSON.parse(savedStock);
+  // Sheet URL pre-configurada — arrancar directo
+  launchApp();
+  loadFromSheet();
+});
+
+function connectSheet() {
+  const url = document.getElementById('sheet-url-input').value.trim();
+  if (!url.startsWith('https://script.google.com')) {
+    showToast('⚠️ URL inválida. Debe ser una URL de Google Apps Script.');
+    return;
+  }
+  sheetUrl = url;
+  localStorage.setItem('ipn_sheet_url', url);
+  launchApp();
+}
+
+function useDemoMode() {
+  demoMode = true;
+  // Pre-load some demo stock values
+  PRODUCTOS.forEach(p => {
+    stockData[p[0]] = Math.floor(Math.random() * (p[3] + 5));
+  });
+  launchApp();
+  showToast('Modo demo activo — los datos no se guardan en Google Sheets');
+}
+
+function launchApp() {
+  document.getElementById('setup-panel').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('sheet-id-display').textContent = demoMode ? 'Modo Demo' : '✓ Sheet conectado';
+  renderInventario();
+  renderCompras();
+  updateStats();
+}
+
+// ================================================================
+// RENDER INVENTARIO
+// ================================================================
+function renderInventario() {
+  const q     = document.getElementById('search-inv').value.toLowerCase();
+  const tipo  = document.getElementById('filter-tipo').value;
+  const estado= document.getElementById('filter-estado').value;
+  const tbody = document.getElementById('inv-tbody');
+  tbody.innerHTML = '';
+
+  let lastTipo = null;
+
+  PRODUCTOS.forEach(p => {
+    const [id, nombre, udm, inv_sis, marca, proveedor, precio, tipo_p] = p;
+    if (tipo && tipo_p !== tipo) return;
+    if (q && !nombre.toLowerCase().includes(q)) return;
+
+    const stock = stockData[id];
+    const diff  = (stock !== undefined) ? stock - inv_sis : null;
+
+    // estado filter
+    if (estado) {
+      if (estado === 'crit' && !(stock !== undefined && stock === 0)) return;
+      if (estado === 'warn' && !(stock !== undefined && stock >= 1 && stock <= 3)) return;
+      if (estado === 'ok'   && !(stock !== undefined && stock > 3)) return;
+      if (estado === 'sd'   && stock !== undefined) return;
+    }
+
+    // Section separator
+    if (!q && !tipo && lastTipo !== tipo_p) {
+      lastTipo = tipo_p;
+      const sep = document.createElement('tr');
+      sep.innerHTML = `<td colspan="7" style="background:${tipo_p==='MED'?'#E8F5E9':'#E3F2FD'};
+        font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;
+        color:${tipo_p==='MED'?'#007A33':'#1565C0'};padding:.5rem .8rem;border-bottom:2px solid ${tipo_p==='MED'?'#a5d6a7':'#90caf9'}">
+        ${tipo_p === 'MED' ? '💊 MEDICAMENTOS' : '🩺 DESCARTABLES'}
+      </td>`;
+      tbody.appendChild(sep);
+    }
+
+    const diffHtml = diff === null
+      ? `<span class="diff none">—</span>`
+      : diff >= 0
+        ? `<span class="diff ok">+${diff}</span>`
+        : `<span class="diff ${diff >= -3 ? 'warn' : 'crit'}">${diff}</span>`;
+
+    const inputClass = stock === undefined ? 'stock-input' :
+                       stock === 0 ? 'stock-input crit' :
+                       stock <= 3  ? 'stock-input saved' : 'stock-input saved';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-desc">${nombre}<small>${udm}</small></td>
+      <td class="td-center"><span class="badge badge-${tipo_p.toLowerCase()}">${tipo_p}</span></td>
+      <td class="td-center" style="font-family:'DM Mono',monospace;font-weight:700">${inv_sis}</td>
+      <td class="td-center">
+        <input type="number" min="0" class="${inputClass}" id="s${id}"
+          value="${stock !== undefined ? stock : ''}"
+          placeholder="—"
+          onchange="setStock(${id}, this)"
+          onkeydown="if(event.key==='Enter'){focusNext(${id})}"
+        >
+      </td>
+      <td class="td-center">${diffHtml}</td>
+      <td>
+        <div style="font-size:.8rem;font-weight:600">${proveedor}</div>
+        <div style="font-size:.72rem;color:#888">${marca !== '—' ? marca : ''}</div>
+      </td>
+      <td class="td-center" style="font-family:'DM Mono',monospace;font-size:.78rem;color:#555">
+        ${precio > 0 ? precio.toLocaleString('es-PY') : '—'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function focusNext(currentId) {
+  const ids = PRODUCTOS.map(p => p[0]);
+  const idx = ids.indexOf(currentId);
+  if (idx < ids.length - 1) {
+    const next = document.getElementById(`s${ids[idx+1]}`);
+    if (next) next.focus();
+  }
+}
+
+function setStock(id, input) {
+  const val = parseInt(input.value);
+  if (!isNaN(val) && val >= 0) {
+    stockData[id] = val;
+    input.className = val === 0 ? 'stock-input crit' : 'stock-input saved';
+  } else {
+    delete stockData[id];
+    input.className = 'stock-input';
+  }
+  localStorage.setItem('ipn_stock', JSON.stringify(stockData));
+  updateStats();
+  renderCompras();
+  showSaveStatus();
+}
+
+// ================================================================
+// RENDER COMPRAS
+// ================================================================
+function renderCompras() {
+  const tbody = document.getElementById('compras-tbody');
+  tbody.innerHTML = '';
+
+  const aComprar = PRODUCTOS.filter(p => {
+    const stock = stockData[p[0]];
+    return stock !== undefined && stock < p[3];
+  });
+
+  if (aComprar.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#888">
+      ✅ Todo el stock está en orden o no se han ingresado datos todavía.
+    </td></tr>`;
+    return;
+  }
+
+  let totalGral = 0;
+
+  // Group by proveedor
+  const byProv = {};
+  aComprar.forEach(p => {
+    const prov = p[5];
+    if (!byProv[prov]) byProv[prov] = [];
+    byProv[prov].push(p);
+  });
+
+  Object.entries(byProv).sort().forEach(([prov, prods]) => {
+    // Provider header
+    const ph = document.createElement('tr');
+    ph.innerHTML = `<td colspan="9" style="background:#1B4F9B;color:#fff;font-weight:700;
+      font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;padding:.5rem .8rem">
+      🏪 ${prov}
+    </td>`;
+    tbody.appendChild(ph);
+
+    prods.forEach(p => {
+      const [id, nombre, udm, inv_sis, marca, proveedor, precio, tipo_p] = p;
+      const stock    = stockData[id];
+      const necesita = inv_sis - stock;
+      const total    = necesita * precio;
+      totalGral     += total;
+
+      const urgente = stock === 0;
+      const rowBg   = urgente ? '#fff5f5' : '';
+
+      const tr = document.createElement('tr');
+      tr.style.background = rowBg;
+      tr.innerHTML = `
+        <td class="td-desc" style="${urgente ? 'color:#C8102E' : ''}">
+          ${urgente ? '🔴 ' : '🟡 '}${nombre}
+          <small>${udm}</small>
+        </td>
+        <td class="td-center"><span class="badge badge-${tipo_p.toLowerCase()}">${tipo_p}</span></td>
+        <td class="td-center" style="font-family:'DM Mono',monospace">${inv_sis}</td>
+        <td class="td-center" style="font-family:'DM Mono',monospace;color:${urgente?'#C8102E':'#e6a800'};font-weight:700">${stock}</td>
+        <td class="td-center"><span class="need-qty">+${necesita}</span></td>
+        <td><span class="proveedor-badge">${proveedor}</span></td>
+        <td style="font-size:.8rem;font-weight:600">${marca !== '—' ? marca : '—'}</td>
+        <td class="td-center precio-val">${precio > 0 ? precio.toLocaleString('es-PY') : '—'}</td>
+        <td class="td-center precio-val" style="font-weight:700">
+          ${precio > 0 ? total.toLocaleString('es-PY') : '—'}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+
+  // Total row
+  const tr = document.createElement('tr');
+  tr.className = 'total-row';
+  tr.innerHTML = `
+    <td colspan="4" style="text-align:right">TOTAL ESTIMADO A GASTAR</td>
+    <td class="td-center need-qty">${aComprar.length} ítems</td>
+    <td colspan="3"></td>
+    <td class="td-center" style="color:${totalGral>0?'#FFC72C':'#aaa'};font-size:1rem">
+      ${totalGral > 0 ? 'Gs. ' + totalGral.toLocaleString('es-PY') : '—'}
+    </td>
+  `;
+  tbody.appendChild(tr);
+}
+
+// ================================================================
+// STATS
+// ================================================================
+function updateStats() {
+  const total    = PRODUCTOS.length;
+  const cargados = Object.keys(stockData).length;
+  const warns    = PRODUCTOS.filter(p => stockData[p[0]] !== undefined && stockData[p[0]] >= 1 && stockData[p[0]] <= 3).length;
+  const compras  = PRODUCTOS.filter(p => stockData[p[0]] !== undefined && stockData[p[0]] < p[3]).length;
+
+  document.getElementById('stat-total').textContent    = total;
+  document.getElementById('stat-cargados').textContent = cargados;
+  document.getElementById('stat-warn').textContent     = warns;
+  document.getElementById('stat-compras').textContent  = compras;
+  document.getElementById('prog-cargados').style.width = Math.round(cargados/total*100) + '%';
+}
+
+// ================================================================
+// TABS
+// ================================================================
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && tab==='inventario') || (i===1 && tab==='compras'));
+  });
+  document.getElementById('tab-inventario').style.display = tab === 'inventario' ? 'block' : 'none';
+  document.getElementById('tab-compras').style.display    = tab === 'compras'    ? 'block' : 'none';
+  if (tab === 'compras') renderCompras();
+}
+
+// ================================================================
+// GOOGLE SHEETS SYNC
+// ================================================================
+// ================================================================
+// GOOGLE SHEETS SYNC — Form submit method (works from any origin)
+// Write: hidden form POST to Apps Script (no CORS restriction)
+// Read:  window.open + localStorage message bridge
+// ================================================================
+
+function syncToSheet() {
+  if (!sheetUrl) { showToast('⚠️ No hay Sheet conectado.'); return; }
+
+  const stockPayload = {};
+  PRODUCTOS.forEach(p => {
+    const stock = stockData[p[0]];
+    if (stock !== undefined) stockPayload[p[0]] = stock;
+  });
+
+  if (Object.keys(stockPayload).length === 0) {
+    showToast('⚠️ No hay stock cargado para guardar');
+    return;
+  }
+
+  showSavingOverlay(true);
+
+  // Usar GET con window.open — exactamente como la prueba manual que funcionó
+  const url = sheetUrl + '?action=write&data=' + encodeURIComponent(JSON.stringify(stockPayload));
+  const popup = window.open(url, '_blank', 'width=500,height=400,top=100,left=200');
+
+  // Detectar cuando el popup se cierra
+  const check = setInterval(() => {
+    if (!popup || popup.closed) {
+      clearInterval(check);
+      showSavingOverlay(false);
+      showSaveStatus();
+    }
+  }, 500);
+
+  // Timeout máximo de 15s
+  setTimeout(() => {
+    clearInterval(check);
+    showSavingOverlay(false);
+    if (!popup || popup.closed) {
+      showSaveStatus();
+    } else {
+      popup.close();
+      showSaveStatus();
+    }
+  }, 15000);
+}
+
+
+function showSavingOverlay(show) {
+  let el = document.getElementById('saving-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'saving-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(27,79,155,.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    el.innerHTML = '<div style="background:#fff;border-radius:16px;padding:2rem 2.5rem;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.3)">'
+      + '<div style="font-size:2.5rem;margin-bottom:.5rem">&#9729;</div>'
+      + '<div style="font-size:1.1rem;font-weight:700;color:#1B4F9B">Guardando en Google Sheets...</div>'
+      + '<div style="font-size:.82rem;color:#666;margin-top:.4rem">Esto toma unos segundos</div>'
+      + '<div style="margin-top:1rem;height:4px;background:#eee;border-radius:2px;overflow:hidden">'
+      + '<div id="save-prog" style="height:100%;background:#1B4F9B;border-radius:2px;animation:prog 4.5s linear forwards"></div>'
+      + '</div></div>';
+    const style = document.createElement('style');
+    style.textContent = '@keyframes prog{from{width:0%}to{width:100%}}';
+    document.head.appendChild(style);
+    document.body.appendChild(el);
+  }
+  el.style.display = show ? 'flex' : 'none';
+  if (show) {
+    const bar = el.querySelector('#save-prog');
+    bar.style.animation = 'none';
+    bar.offsetHeight;
+    bar.style.animation = 'prog 4.5s linear forwards';
+  }
+}
+
+function loadFromSheet() {
+  // On startup: load from localStorage (already saved locally on every input)
+  const saved = localStorage.getItem('ipn_stock');
+  if (saved) {
+    try {
+      stockData = JSON.parse(saved);
+      renderInventario(); renderCompras(); updateStats();
+    } catch(e) {}
+  }
+}
+
+function loadFromSheetManual() {
+  // Open the read URL in a new tab — user can see the JSON data
+  // Data is already preserved in localStorage automatically
+  showToast('ℹ️ Los datos se guardan localmente en este navegador automáticamente');
+  const saved = localStorage.getItem('ipn_stock');
+  if (saved) {
+    try {
+      stockData = JSON.parse(saved);
+      renderInventario(); renderCompras(); updateStats();
+      showToast('✅ Datos restaurados desde memoria local (' + Object.keys(stockData).length + ' registros)');
+    } catch(e) {
+      showToast('❌ Error al leer datos locales');
+    }
+  } else {
+    showToast('ℹ️ No hay datos guardados localmente aún');
+  }
+}
+
+// ================================================================
+// EXPORT / PRINT
+// ================================================================
+function exportarCompras() {
+  const aComprar = PRODUCTOS.filter(p => stockData[p[0]] !== undefined && stockData[p[0]] < p[3]);
+  if (!aComprar.length) { showToast('No hay productos para comprar.'); return; }
+
+  const fecha = new Date().toLocaleDateString('es-PY');
+  let csv = `LISTA DE COMPRAS QUIROFANO IPN - ${fecha}\n`;
+  csv += 'PRODUCTO,TIPO,INV MINIMO,STOCK ACTUAL,A COMPRAR,PROVEEDOR,MARCA,PRECIO UNIT,TOTAL\n';
+  aComprar.forEach(p => {
+    const stock    = stockData[p[0]];
+    const necesita = p[3] - stock;
+    csv += `"${p[1]}",${p[7]},${p[3]},${stock},${necesita},"${p[5]}","${p[4]}",${p[6]},${necesita*p[6]}\n`;
+  });
+
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `compras_quirofano_${fecha.replace(/\//g,'-')}.csv`;
+  a.click();
+}
+
+function imprimirCompras() {
+  window.print();
+}
+
+// ================================================================
+// UI HELPERS
+// ================================================================
+function showSaveStatus() {
+  const el = document.getElementById('save-status');
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 2200);
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 3500);
+}
+</script>
+
+</body>
+</html>
